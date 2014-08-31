@@ -1,0 +1,19 @@
+[
+    {
+        "excludeDir": [
+            "images",
+            "snippet",
+            "test_ts",
+            "design_result",
+            "css"
+        ],
+        "includeExt": [
+            ".ts"
+        ],
+        "keepOriginalString": true,
+        "pattern": "/([\\s]*hx.log[add|remove]*\\(.*\\);)\\n/g",
+        "replacePostfix": "",
+        "replacePrefix": "//LOG DELETED ",
+        "source": "~/tmp"
+    }
+]

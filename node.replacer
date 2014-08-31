@@ -1,0 +1,214 @@
+#!/usr/bin/env node
+
+/*
+ * string replacer
+ *
+ * example
+ * var pattern = /(hx.log[add|remove]*\(.*\);)/g;
+ * var replacePrefix = "//LOG DELETED "
+ * var replacePostfix = "";
+ * var keepOriginalString = true;
+ * var excludeDir = ["images"];
+ * var includeExt = [".ts"];
+ * var bufferSize =  1024 * 1024;
+ *
+ * author: deptno@gmail.com
+ * modified: 2014-08-29 16:14:47
+ */
+var pattern = "Hello";
+var keepOriginalString = true;
+var replacePrefix = "WORLD";
+var replacePostfix = "";
+var excludeDir = ["images", "snippet", "test_ts", "design_result", "css"];
+var includeExt = [".ts"];
+var bufferSize =  1024 * 1024;
+
+var fs = require("fs");
+var path = require("path");
+var queueDir = [];
+var queueFile = [];
+var exit = (function exit(condition) {
+    var exitTimer = null;
+    return function() {
+        if (exitTimer) {
+            clearTimeout(exitTimer);
+            exitTimer = null;
+        }
+        if (condition()) {
+            exitTimer = setTimeout(process.exit, 2 * 1000);
+            console.log("exit timer executed");
+        }
+    }
+}(function condition() {
+    return queueFile.length === 0 && queueDir.length === 0;
+}));
+
+function getJSON() {
+	/*
+	 *  control by json file but not used in now
+	 */
+	function getJsonWithPath(directory) {
+		return makeDirectoryPathWithSlash(directory) + __filename.substring(__filename.lastIndexOf("/") + 1) + ".json";
+	}
+	var directoryToReadSquence = [process.env.PWD, __dirname];
+	var fileConfig;
+	var stat;
+	var json = null;
+	if (process.argv[2]) {
+		directoryToReadSquence.unshift(process.argv[2]);
+	}
+	while (directoryToReadSquence.length) {
+		try {
+			fileConfig = getJsonWithPath(directoryToReadSquence.shift());
+			console.error("check" + fileConfig + "...");
+			stat = fs.statSync(fileConfig);
+			if (stat.isDirectory()) {
+				console.error(fileConfig + " is directory will be skipped");
+				continue;
+			}
+			try {
+				json = JSON.parse(fileConfig);
+				break;
+			} catch (e) {
+				console.error(fileConfig + " file is valid JSON");
+			}
+			break;
+		} catch (e) {
+			console.log(fileConfig + " could not found");
+		}
+	};
+	return json;
+}
+
+function makeFunctionGetLine(lf) {
+	var ret = 0;
+	var length = lf.length;
+	return function(offset, byteAdded) {
+		lf.map(function(value, index, array) {
+			array[index] += byteAdded;
+			return true;
+		});
+		for (var i = ret; i < length; i++) {
+			if (lf[i] > offset) {
+				ret = i;
+				break;
+			}
+		}
+		return ret + 1;
+	}
+}
+function getReplacedString(string, prefix, postfix, keepOriginal) {
+	var ret = prefix;
+	if (keepOriginal) {
+		ret += string;
+	}
+	return ret + postfix;
+}
+function replacer(filepath) {
+    fs.open(filepath, "r+", function(err, fd) {
+        catcherThrow(err);
+        var bufRead = new Buffer(bufferSize);
+        var byteRead = fs.readSync(fd, bufRead, 0, bufferSize, 0);
+		var lf = [];
+        if (byteRead === bufferSize) {
+            catcherThrow(filepath + ": exceed buffer size");
+        }
+        bufRead.length = byteRead;
+		for (var i = 0; i < byteRead; i++) {
+			if (bufRead[i] === 0x000a) { // \n
+				lf.push(i);
+			}
+		}
+		var getLine = makeFunctionGetLine(lf);		
+		var isWorkedFile = function(string, offset, prefix) {
+			var ret = true;
+			if (typeof prefix === "string") {
+				ret = prefix.length ? prefix === string.substring(offset - prefix.length, offset) : false;
+				isWorkedFile = function() {
+					return ret;
+				}
+			}
+			return ret;
+		}
+        var bufWrite = new Buffer(bufRead.toString().replace(pattern, function(match) {
+			var string = Array.prototype.pop.call(arguments);
+			var offset = Array.prototype.pop.call(arguments);
+			var ret = match;
+			var stringReplaced = getReplacedString(match, replacePrefix, replacePostfix, keepOriginalString);
+			var lineNumber = getLine(offset, stringReplaced.length - match.length);
+			var log = "[" + path.basename(filepath) + ":" + lineNumber + "]: " + match;
+			if (!isWorkedFile(string, offset, replacePrefix)) {
+				ret = stringReplaced;
+				console.log(log + " => " + "\033[33;40m" + stringReplaced + "\033[33;37m");
+			} else {
+				console.log(log);
+			}
+			return ret;
+        }));
+        fs.close(fd);
+		if (!isWorkedFile()) {
+			fs.writeFile(filepath, bufWrite, function(err) {
+				catcherThrow(err);
+				console.log("\033[31;35m[file: " + filepath + "] read: " + byteRead + ": write: " + bufWrite.length + "\033[33;37m");
+			});
+		}
+    });
+}
+function catcherThrow(err) {
+    if (err) {
+        console.log(queueFile);
+        console.log(queueDir);
+        throw err;
+    }
+}
+function makeTree(directory) {
+    fs.readdir(directory, function(err, files) {
+        catcherThrow(err);
+        files.map(function(value, index, array) {
+            return value[0] !== "." && excludeDir.indexOf(value) === -1;
+        });
+        for (var i = 0; i < files.length; i++) {
+            !function(filepath) {
+                fs.stat(filepath, function(err, stat) {
+                    catcherThrow(err);
+                    if (stat.isDirectory()) {
+                        console.log("directory pushed: " + makeDirectoryPathWithSlash(filepath));
+                        queueDir.push(makeDirectoryPathWithSlash(filepath));
+                    } else if (includeExt.indexOf(path.extname(filepath)) !== -1) {
+                        console.log("file pushed: " + filepath);
+                        queueFile.push(filepath);
+                    }
+                });
+            }(directory + files[i]);
+        }
+    });
+}
+function makeDirectoryPathWithSlash(path) {
+    if (path[path.length - 1] !== "/") {
+        path += "/";
+    }
+    return path;
+}
+function workerReplace() {
+    while (queueFile.length) {
+        replacer(queueFile.pop());
+        exit();
+    }
+}
+function workerMakeTree() {
+    while (queueDir.length) {
+        makeTree(queueDir.pop());
+        exit();
+    }
+}
+
+fs.stat(process.argv[2], function(err, stat) {
+	catcherThrow(err);
+	if (stat.isDirectory()) {
+		setTimeout(makeTree(makeDirectoryPathWithSlash(process.argv[2])), 0);
+		setInterval(workerReplace, 100);
+		setInterval(workerMakeTree, 100);
+	} else {
+		replacer(process.argv[2]);
+	}
+});
