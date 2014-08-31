@@ -1,0 +1,24 @@
+ * node.replacer
+
+ * description
+ 	* support file & directory recursively
+
+ * user can modify 6 variables
+	*  pattern: string or regexp object
+	*  keepOriginalString: boolean, keep searched string by pattern
+	*  replacePrefix: string, prefix-searched string
+	*  replacePostfix: string, searched string-postfix
+	*  excludeDir: string array, node.replacer will skip these recursively
+	*  includeExt: string array, format like "['.ts', '.js']"
+	*  bufferSize: number, read buffer size, if one file exceed bufferSize, will throw error
+
+ * todo
+	* support node.replacer.json that array contains 6 variables
+	* support source, target directory
+	* keep just "node.replacer" only file
+	* test functionality for not changing files, just only watching grep pattern correctly
+	* user can set node.replacer end condition, it is hardcoded now
+	* READEME need to check english is correct
+
+ * last modified README file
+	* 2014-09-01 02:04:39
