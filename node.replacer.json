@@ -1,5 +1,6 @@
 [
     {
+        "name": "replace \"hx.log[add|remove]\" => \"//LOG DELETED\"",
         "excludeDir": [
             "images",
             "snippet",
@@ -14,6 +15,24 @@
         "pattern": "/([\\s]*hx.log[add|remove]*\\(.*\\);)\\n/g",
         "replacePostfix": "",
         "replacePrefix": "//LOG DELETED ",
+        "source": "~/tmp"
+    },
+    {
+        "name": "replace \"CRLF\" => \"LF\"",
+        "excludeDir": [
+            "images",
+            "snippet",
+            "test_ts",
+            "design_result",
+        ],
+        "includeExt": [
+            ".js",
+            ".css"
+        ],
+        "keepOriginalString": false,
+        "pattern": "/(\\r\\n)/g",
+        "replacePostfix": "",
+        "replacePrefix": "\n",
         "source": "~/tmp"
     }
 ]

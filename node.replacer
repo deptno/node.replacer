@@ -15,32 +15,34 @@
  * author: deptno@gmail.com
  * modified: 2014-08-29 16:14:47
  */
-var pattern = "Hello";
-var keepOriginalString = true;
-var replacePrefix = "WORLD";
+var pattern = /(\r\n)/g;
+var keepOriginalString = false;
+var replacePrefix = "\n";
 var replacePostfix = "";
 var excludeDir = ["images", "snippet", "test_ts", "design_result", "css"];
-var includeExt = [".ts"];
+var includeExt = [".js"];
 var bufferSize =  1024 * 1024;
+var test = false;
 
 var fs = require("fs");
 var path = require("path");
+var directoryIdentifier = process.platform === "win32" ? "\\" : "/";
 var queueDir = [];
 var queueFile = [];
+var countFile = 0;
+var countWorked = 0;
+var countAlreadyWorked = 0;
 var exit = (function exit(condition) {
     var exitTimer = null;
     return function() {
-        if (exitTimer) {
-            clearTimeout(exitTimer);
-            exitTimer = null;
-        }
         if (condition()) {
-            exitTimer = setTimeout(process.exit, 2 * 1000);
-            console.log("exit timer executed");
+        	process.exit();
+        } else {
+        	return;
         }
     }
 }(function condition() {
-    return queueFile.length === 0 && queueDir.length === 0;
+    return queueFile.length === 0 && queueDir.length === 0 && countFile === countWorked + countAlreadyWorked;
 }));
 
 function getJSON() {
@@ -48,7 +50,7 @@ function getJSON() {
 	 *  control by json file but not used in now
 	 */
 	function getJsonWithPath(directory) {
-		return makeDirectoryPathWithSlash(directory) + __filename.substring(__filename.lastIndexOf("/") + 1) + ".json";
+		return makeDirectoryPathWithSlash(directory) + __filename.substring(__filename.lastIndexOf(directoryIdentifier) + 1) + ".json";
 	}
 	var directoryToReadSquence = [process.env.PWD, __dirname];
 	var fileConfig;
@@ -146,16 +148,24 @@ function replacer(filepath) {
 			return ret;
         }));
         fs.close(fd);
-		if (!isWorkedFile()) {
+		if (!isWorkedFile() && !test) {
+			console.log("WORK BEFORE \033[31;35m[file: " + filepath + "] read: " + byteRead + ": write: " + bufWrite.length + "\033[33;37m");
 			fs.writeFile(filepath, bufWrite, function(err) {
+				if (err) {console.log("C8")}
 				catcherThrow(err);
 				console.log("\033[31;35m[file: " + filepath + "] read: " + byteRead + ": write: " + bufWrite.length + "\033[33;37m");
+				countWorked++;
+				exit();
 			});
+		} else {
+			countAlreadyWorked++;
+			console.log("WORKED");
 		}
     });
 }
 function catcherThrow(err) {
     if (err) {
+    	console.log("exception");
         console.log(queueFile);
         console.log(queueDir);
         throw err;
@@ -177,6 +187,7 @@ function makeTree(directory) {
                     } else if (includeExt.indexOf(path.extname(filepath)) !== -1) {
                         console.log("file pushed: " + filepath);
                         queueFile.push(filepath);
+                        countFile++;
                     }
                 });
             }(directory + files[i]);
@@ -184,24 +195,24 @@ function makeTree(directory) {
     });
 }
 function makeDirectoryPathWithSlash(path) {
-    if (path[path.length - 1] !== "/") {
-        path += "/";
+    if (path[path.length - 1] !== directoryIdentifier) {
+        path += directoryIdentifier;
     }
     return path;
 }
 function workerReplace() {
     while (queueFile.length) {
         replacer(queueFile.pop());
-        exit();
     }
 }
 function workerMakeTree() {
     while (queueDir.length) {
         makeTree(queueDir.pop());
-        exit();
     }
 }
 
+console.log("process.argv[2]: " + process.argv);
+console.log("process.argv[2]: " + process.argv[2]);
 fs.stat(process.argv[2], function(err, stat) {
 	catcherThrow(err);
 	if (stat.isDirectory()) {
