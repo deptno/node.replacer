@@ -32,10 +32,16 @@ var queueFile = [];
 var countFile = 0;
 var countWorked = 0;
 var countAlreadyWorked = 0;
+var workedData = [];
 var exit = (function exit(condition) {
     var exitTimer = null;
     return function() {
         if (condition()) {
+        	console.log("\033[31;35m[file: ");
+        	for (var i = 0, len = workedData.length; i < len; i++) {
+				console.log(workedData[i].filepath + "] read: " + workedData[i].byteRead + ": write: " + workedData[i].byteWrite);
+        	}
+			console.log("\033[33;37m");
         	process.exit();
         } else {
         	return;
@@ -149,17 +155,20 @@ function replacer(filepath) {
         }));
         fs.close(fd);
 		if (!isWorkedFile() && !test) {
-			console.log("WORK BEFORE \033[31;35m[file: " + filepath + "] read: " + byteRead + ": write: " + bufWrite.length + "\033[33;37m");
 			fs.writeFile(filepath, bufWrite, function(err) {
 				if (err) {console.log("C8")}
 				catcherThrow(err);
-				console.log("\033[31;35m[file: " + filepath + "] read: " + byteRead + ": write: " + bufWrite.length + "\033[33;37m");
+				// console.log("\033[31;35m[file: " + filepath + "] read: " + byteRead + ": write: " + bufWrite.length + "\033[33;37m");
+				workedData.push({
+					filepath: filepath,
+					byteRead: byteRead,
+					byteWrite: bufWrite.length
+				})
 				countWorked++;
 				exit();
 			});
 		} else {
 			countAlreadyWorked++;
-			console.log("WORKED");
 			exit();
 		}
     });
