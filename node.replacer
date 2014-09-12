@@ -160,6 +160,7 @@ function replacer(filepath) {
 		} else {
 			countAlreadyWorked++;
 			console.log("WORKED");
+			exit();
 		}
     });
 }
